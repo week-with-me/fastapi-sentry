@@ -5,7 +5,7 @@ from starlette.middleware.base import (BaseHTTPMiddleware,
 
 from src.core import get_settings
 
-sentry_sdk.init(dsn=get_settings().DSN)
+sentry_sdk.init(dsn=get_settings().SENTRY_DSN)
 
 
 class SentryMiddlware(BaseHTTPMiddleware):
