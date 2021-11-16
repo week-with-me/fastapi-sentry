@@ -1,0 +1,1 @@
+from src.middleware.monitoring import SentryMiddlware

@@ -1,7 +1,13 @@
 import uvicorn
 from fastapi import FastAPI
 
-app = FastAPI()
+from src.core import get_settings
+from src.middleware import SentryMiddlware
+
+app = FastAPI(title=get_settings().PROJECT_TITLE)
+
+
+app.add_middleware(SentryMiddlware)
 
 
 if __name__ == '__main__':
