@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 
 from src.core import get_settings
-from src.model import User
+from src.model import User, Post
 from src.database import Base, engine
 
 
