@@ -3,11 +3,13 @@ from logging.config import fileConfig
 from alembic import context
 
 from src.core import get_settings
+from src.model import User
 from src.database import Base, engine
 
 
 config = context.config
 fileConfig(config.config_file_name)
+
 
 config.set_main_option('sqlalchemy.url', get_settings().DB_URL)
 
@@ -28,14 +30,15 @@ def run_migrations_offline():
 
 
 async def run_migrations_online():
-    async def do_migrations(connection):
+    def do_migrations(connection):
         context.configure(
             connection = connection,
-            target_metadata = target_metadata
+            target_metadata = target_metadata,
+            include_schemas = True
         )
         
-        async with context.begin_transaction():
-            await context.run_migrations()
+        with context.begin_transaction():
+            context.run_migrations()
             
     async with engine.connect() as connection:
         await connection.run_sync(do_migrations)
@@ -44,4 +47,5 @@ async def run_migrations_online():
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online()
+    import asyncio
+    asyncio.run(run_migrations_online())
