@@ -5,8 +5,6 @@ from functools import lru_cache
 
 from pydantic import BaseSettings, validator, Field
 
-ENV_PATH = 'src/core/.env'
-
 
 class Settings(BaseSettings):
     LEVEL: str = 'DEVELOP'
@@ -23,7 +21,7 @@ class Settings(BaseSettings):
             os.environ['SECRET_KEY'] = secrets.token_urlsafe(32)
     
     class Config:
-        env_file = ENV_PATH
+        env_file = '.env'
         
         
 class DevelopSettings(Settings):
