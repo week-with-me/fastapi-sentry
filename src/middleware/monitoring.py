@@ -1,15 +1,21 @@
 import json
 import sentry_sdk
-from fastapi import Request, Response
+from fastapi import Request, Response, HTTPException
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from starlette.middleware.base import (BaseHTTPMiddleware,
                                        RequestResponseEndpoint)
 
 from src.core import get_settings
 
-sentry_sdk.init(dsn=get_settings().SENTRY_DSN, traces_sample_rate=1.0)
+sentry_sdk.init(
+    dsn          = get_settings().SENTRY_DSN,
+    integrations = [SqlalchemyIntegration()],
+    environment  = 'DEVELOP',
+    release      = '0'
+)
 
 
-class AsyncInteratorWrapper:
+class AsyncIteratorWrapper:
     def __init__(self, object) -> None:
         self._iter = iter(object)
         
@@ -30,34 +36,37 @@ class SentryMiddlware(BaseHTTPMiddleware):
         request: Request,
         call_next: RequestResponseEndpoint
     ) -> Response:
-        try:
-            response    = await call_next(request)
-            status_code = response.__dict__['status_code']
+        with sentry_sdk.configure_scope() as scope:        
+            try:
+                response    = await call_next(request)
+                status_code = response.__dict__['status_code']
+                            
+                if status_code >= 400 and status_code < 500:
+                        body_encode = [
+                            data async for data \
+                                in response.__dict__['body_iterator']
+                        ]
+                        response.__setattr__(
+                            'body_iterator',
+                            AsyncIteratorWrapper(body_encode)
+                        )                    
+                        body = json.loads(body_encode[0].decode())
+                        scope.set_context('request', request)
+                        scope.set_context('response', body)
+                        scope.user = {'IP Address': request.client.host}
+                        sentry_sdk.capture_exception(
+                            HTTPException(
+                                status_code = status_code,
+                                detail      = body['detail']
+                            )
+                        )
                         
-            if status_code >= 400 and status_code < 500:
-                with sentry_sdk.push_scope() as scope:
-                    body_encode = [
-                        data async for data \
-                            in response.__dict__['body_iterator']
-                    ]
-                    response.__setattr__(
-                        'body_iterator',
-                        AsyncInteratorWrapper(body_encode)
-                    )                    
-                    body = json.loads(body_encode[0].decode())
-                    scope.set_context('response', body)
-                    scope.set_context('request', request)
-                    scope.user = {'IP Address': request.client.host}
-                    sentry_sdk.capture_message(
-                        f'{status_code} HTTP EXCEPTION'
-                    )
-            return response
-        
-        except Exception as error:
-            with sentry_sdk.push_scope() as scope:
+                return response
+            
+            except Exception as error:
                 scope.set_context('request', request)
                 scope.user = {'IP Address': request.client.host}
                 sentry_sdk.capture_exception(error)
-            
-            raise error
-            
+                
+                raise error
+                
